@@ -43,7 +43,6 @@ func TestMutex(t *testing.T) {
 		success, err := mutex.TryLock(ctx)
 		require.NoError(t, err)
 		require.True(t, success)
-		mutex.Unlock(ctx)
 	})
 
 	t.Run("Try to take lock when taken", func(t *testing.T) {
@@ -51,11 +50,25 @@ func TestMutex(t *testing.T) {
 		success, err := mutex.TryLock(ctx)
 		require.NoError(t, err)
 		require.True(t, success)
-		defer mutex.Unlock(ctx)
 
 		success, err = mutex.TryLock(ctx)
 		require.NoError(t, err)
 		require.False(t, success)
+	})
+
+	t.Run("Try to free lock when taken", func(t *testing.T) {
+		mutex := NewMutex(client, RandomLockName())
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+		err = mutex.Unlock(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("Try to free lock when free", func(t *testing.T) {
+		mutex := NewMutex(client, RandomLockName())
+		err = mutex.Unlock(ctx)
+		require.NoError(t, err)
 	})
 
 }
