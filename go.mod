@@ -2,6 +2,8 @@ module github.com/sovietaced/go-redisson
 
 go 1.20
 
+replace github.com/docker/docker v23.0.5+incompatible => github.com/docker/docker v23.0.7-0.20230730020554-801e90549aac+incompatible
+
 require (
 	github.com/redis/go-redis/v9 v9.0.4
 	github.com/stretchr/testify v1.8.2

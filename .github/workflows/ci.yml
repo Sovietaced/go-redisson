@@ -1,16 +1,7 @@
 on: [push, pull_request]
 name: ci
 jobs:
-  login:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
   test:
-    needs: login
     strategy:
       matrix:
         go-version: [1.20.x]
