@@ -23,7 +23,7 @@ func TestMutex(t *testing.T) {
 		Started:          true,
 	})
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("failed to create redis container: %v", err)
 	}
 	defer func() {
 		if err := redisContainer.Terminate(ctx); err != nil {
@@ -33,7 +33,7 @@ func TestMutex(t *testing.T) {
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("failed to get container endpoint: %v", err)
 	}
 
 	client := redis.NewClient(&redis.Options{Addr: endpoint})
