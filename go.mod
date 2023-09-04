@@ -1,4 +1,4 @@
-module go-redisson
+module github.com/sovietaced/go-redisson
 
 go 1.20
 

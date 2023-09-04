@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const defaultLeaseDuration time.Duration = 30 * time.Second
+const defaultLeaseDuration = 30 * time.Second
 const lockScript = `
 	if redis.call('exists',KEYS[1]) == 0 then
 		redis.call('set',KEYS[1], 1)
@@ -24,9 +24,9 @@ const unlockScript = `
 `
 
 type Mutex struct {
-	client  redis.UniversalClient
-	key     string
-	options Options
+	client        redis.UniversalClient
+	key           string
+	leaseDuration time.Duration
 }
 
 type Options struct {
@@ -52,7 +52,7 @@ func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mute
 	for _, option := range options {
 		option(opts)
 	}
-	return &Mutex{key: key, client: client, options: *opts}
+	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration}
 }
 
 func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
@@ -65,16 +65,16 @@ func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 }
 
 func (m *Mutex) doTryLock(ctx context.Context) (int64, error) {
-	ttl, err := m.client.Eval(ctx, lockScript, []string{m.key}, m.options.leaseDuration.Milliseconds()).Result()
+	ttl, err := m.client.Eval(ctx, lockScript, []string{m.key}, m.leaseDuration.Milliseconds()).Int64()
 	if err != nil {
 		return 0, err
 	}
 
-	return ttl.(int64), nil
+	return ttl, nil
 }
 
 func (m *Mutex) Unlock(ctx context.Context) error {
-	_, err := m.client.Eval(ctx, unlockScript, []string{m.key}, m.options.leaseDuration.Milliseconds()).Int64()
+	_, err := m.client.Eval(ctx, unlockScript, []string{m.key}, m.leaseDuration.Milliseconds()).Int64()
 	if err != nil {
 		return fmt.Errorf("unlocked failed: %w", err)
 	}

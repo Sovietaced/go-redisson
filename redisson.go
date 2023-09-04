@@ -2,7 +2,7 @@ package redisson
 
 import (
 	"github.com/redis/go-redis/v9"
-	"go-redisson/mutex"
+	"github.com/sovietaced/go-redisson/mutex"
 )
 
 type Redisson struct {
