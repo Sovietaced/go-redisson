@@ -110,7 +110,8 @@ func TestMutex(t *testing.T) {
 	})
 
 	t.Run("Wait for a lock that is already locked", func(t *testing.T) {
-		mutex := NewMutex(client, RandomLockName())
+		fakeClock := clock.NewMock()
+		mutex := NewMutex(client, RandomLockName(), WithClock(fakeClock))
 		success, err := mutex.TryLock(ctx)
 		require.NoError(t, err)
 		require.True(t, success)
