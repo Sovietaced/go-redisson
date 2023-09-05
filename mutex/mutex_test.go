@@ -8,6 +8,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"math/rand"
 	"testing"
+	"time"
 )
 
 func TestMutex(t *testing.T) {
@@ -69,6 +70,21 @@ func TestMutex(t *testing.T) {
 		mutex := NewMutex(client, RandomLockName())
 		err = mutex.Unlock(ctx)
 		require.NoError(t, err)
+	})
+
+	t.Run("Ensure that lease is extended while lock is held", func(t *testing.T) {
+		mutex := NewMutex(client, RandomLockName(), WithLeaseDuration(10*time.Millisecond))
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		// Sleep past the lease duration
+		time.Sleep(20 * time.Millisecond)
+
+		// Should not be able to acquire the lock again
+		success, err = mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.False(t, success)
 	})
 
 }
