@@ -109,6 +109,97 @@ func TestMutex(t *testing.T) {
 		require.True(t, success)
 	})
 
+	t.Run("Wait for a lock that is already locked", func(t *testing.T) {
+		fakeClock := clock.NewMock()
+		mutex := NewMutex(client, RandomLockName(), WithClock(fakeClock))
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		acquired := false
+		go func() {
+			err = mutex.Lock(ctx)
+			require.NoError(t, err)
+			acquired = true
+		}()
+
+		// Wait for a subscriber
+		require.Eventually(t, func() bool {
+			count, err := client.PubSubNumSub(ctx, mutex.getChannelName()).Result()
+			require.NoError(t, err)
+			return count[mutex.getChannelName()] == 1
+		}, 10*time.Second, time.Millisecond)
+
+		// Unlock
+		err = mutex.Unlock(ctx)
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			return acquired
+		}, 10*time.Second, time.Millisecond)
+	})
+
+	t.Run("Give up waiting for a lock that is already locked", func(t *testing.T) {
+		mutex := NewMutex(client, RandomLockName())
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		lockCtx, cancelFunc := context.WithCancel(ctx)
+
+		finished := false
+		go func() {
+			err := mutex.Lock(lockCtx)
+			require.Error(t, err)
+			finished = true
+		}()
+
+		// Wait for a subscriber
+		require.Eventually(t, func() bool {
+			count, err := client.PubSubNumSub(ctx, mutex.getChannelName()).Result()
+			require.NoError(t, err)
+			return count[mutex.getChannelName()] == 1
+		}, 10*time.Second, time.Millisecond)
+
+		// give up
+		cancelFunc()
+		require.Eventually(t, func() bool {
+			return finished
+		}, 10*time.Second, time.Millisecond)
+
+	})
+
+	t.Run("Wait for a lock that is abandoned", func(t *testing.T) {
+		fakeClock := clock.NewMock()
+		mutex := NewMutex(client, RandomLockName(), WithClock(fakeClock))
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		acquired := false
+		go func() {
+			err := mutex.Lock(ctx)
+			require.NoError(t, err)
+			acquired = true
+		}()
+
+		// Wait for a subscriber
+		require.Eventually(t, func() bool {
+			count, err := client.PubSubNumSub(ctx, mutex.getChannelName()).Result()
+			require.NoError(t, err)
+			return count[mutex.getChannelName()] == 1
+		}, 10*time.Second, time.Millisecond)
+
+		// abandon lock
+		client.Del(ctx, mutex.getLockName())
+		// Advance time to trigger channels
+		fakeClock.Add(time.Minute)
+
+		require.Eventually(t, func() bool {
+			return acquired
+		}, 10*time.Second, time.Millisecond)
+
+	})
+
 }
 
 func RandomLockName() string {

@@ -17,6 +17,7 @@ import (
 func main() {
 	client := redis.NewClient(&redis.Options{Addr: endpoint})
 	mutex := mutex.NewMutex(client, "test")
-	success, err := mutex.TryLock(ctx)
+	err := mutex.Lock(ctx)
+	err = mutex.Unlock(ctx)
 }
 ```
