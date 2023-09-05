@@ -3,6 +3,7 @@ package mutex
 import (
 	"context"
 	"fmt"
+	"github.com/benbjohnson/clock"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -31,6 +32,7 @@ const extendScript = `
 `
 
 type Mutex struct {
+	clock                   clock.Clock
 	client                  redis.UniversalClient
 	key                     string
 	leaseDuration           time.Duration
@@ -38,11 +40,13 @@ type Mutex struct {
 }
 
 type Options struct {
+	clock         clock.Clock
 	leaseDuration time.Duration
 }
 
 func defaultOptions() *Options {
 	opts := &Options{}
+	WithClock(clock.New())(opts)
 	WithLeaseDuration(defaultLeaseDuration)(opts)
 	return opts
 }
@@ -55,12 +59,18 @@ func WithLeaseDuration(leaseDuration time.Duration) Option {
 	}
 }
 
+func WithClock(clock clock.Clock) Option {
+	return func(mo *Options) {
+		mo.clock = clock
+	}
+}
+
 func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mutex {
 	opts := defaultOptions()
 	for _, option := range options {
 		option(opts)
 	}
-	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration}
+	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration, clock: opts.clock}
 }
 
 func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
@@ -103,7 +113,7 @@ func (m *Mutex) launchLeaseExtender() {
 }
 
 func (m *Mutex) leaseExtensionLoop(ctx context.Context) {
-	ticker := time.NewTicker(m.leaseDuration / 3)
+	ticker := m.clock.Ticker(m.leaseDuration / 3)
 	defer ticker.Stop()
 
 	for {

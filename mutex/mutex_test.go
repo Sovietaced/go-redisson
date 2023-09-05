@@ -2,6 +2,7 @@ package mutex
 
 import (
 	"context"
+	"github.com/benbjohnson/clock"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -73,13 +74,14 @@ func TestMutex(t *testing.T) {
 	})
 
 	t.Run("Ensure that lease is extended while lock is held", func(t *testing.T) {
-		mutex := NewMutex(client, RandomLockName(), WithLeaseDuration(10*time.Millisecond))
+		fakeClock := clock.NewMock()
+		mutex := NewMutex(client, RandomLockName(), WithClock(fakeClock))
 		success, err := mutex.TryLock(ctx)
 		require.NoError(t, err)
 		require.True(t, success)
 
 		// Sleep past the lease duration
-		time.Sleep(20 * time.Millisecond)
+		fakeClock.Add(time.Minute)
 
 		// Should not be able to acquire the lock again
 		success, err = mutex.TryLock(ctx)

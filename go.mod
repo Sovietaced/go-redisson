@@ -5,6 +5,7 @@ go 1.20
 replace github.com/docker/docker v23.0.5+incompatible => github.com/docker/docker v23.0.7-0.20230730020554-801e90549aac+incompatible
 
 require (
+	github.com/benbjohnson/clock v1.3.5
 	github.com/redis/go-redis/v9 v9.0.4
 	github.com/stretchr/testify v1.8.2
 	github.com/testcontainers/testcontainers-go v0.20.1
