@@ -89,6 +89,26 @@ func TestMutex(t *testing.T) {
 		require.False(t, success)
 	})
 
+	t.Run("Ensure that lease is not extended if lock is unlocked", func(t *testing.T) {
+		fakeClock := clock.NewMock()
+		mutex := NewMutex(client, RandomLockName(), WithClock(fakeClock))
+		success, err := mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		// Immediately unlock
+		err = mutex.Unlock(ctx)
+		require.NoError(t, err)
+
+		// Sleep past the lease duration
+		fakeClock.Add(time.Minute)
+
+		// Should be able to acquire the lock again
+		success, err = mutex.TryLock(ctx)
+		require.NoError(t, err)
+		require.True(t, success)
+	})
+
 }
 
 func RandomLockName() string {

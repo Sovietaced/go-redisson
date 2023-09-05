@@ -4,27 +4,28 @@ import (
 	"context"
 	"fmt"
 	"github.com/benbjohnson/clock"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
 
 const defaultLeaseDuration = 30 * time.Second
 const lockScript = `
-	if redis.call('exists',KEYS[1]) == 0 then
-		redis.call('set',KEYS[1], 1)
-		redis.call('pexpire',KEYS[1],ARGV[1])
+	if redis.call('exists', KEYS[1]) == 0 then
+		redis.call('set', KEYS[1], ARGV[2])
+		redis.call('pexpire', KEYS[1],ARGV[1])
 		return 0
 	end
 	return redis.call('pttl',KEYS[1])`
 const unlockScript = `
-	if (redis.call('exists', KEYS[1]) == 0) then
+	if redis.call('exists', KEYS[1]) == 0 then
 		return 0;
 	end;
 	redis.call('del', KEYS[1]);
 	return 1;
 `
 const extendScript = `
-	if (redis.call('exists', KEYS[1]) == 1) then
+	if redis.call('get', KEYS[1]) == ARGV[2] then
 		redis.call('pexpire', KEYS[1], ARGV[1]);
 		return 1;
 	end;
@@ -32,11 +33,10 @@ const extendScript = `
 `
 
 type Mutex struct {
-	clock                   clock.Clock
-	client                  redis.UniversalClient
-	key                     string
-	leaseDuration           time.Duration
-	leaseExtenderCancelFunc context.CancelFunc
+	clock         clock.Clock
+	client        redis.UniversalClient
+	key           string
+	leaseDuration time.Duration
 }
 
 type Options struct {
@@ -83,14 +83,16 @@ func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 }
 
 func (m *Mutex) doTryLock(ctx context.Context) (int64, error) {
-	ttl, err := m.client.Eval(ctx, lockScript, []string{m.key}, m.leaseDuration.Milliseconds()).Int64()
+	// Create an extension ID so that we only extend this lease if we own the lock
+	extensionId := uuid.New()
+	ttl, err := m.client.Eval(ctx, lockScript, []string{m.key}, m.leaseDuration.Milliseconds(), extensionId).Int64()
 	if err != nil {
 		return 0, err
 	}
 
 	// If lock was acquired, kick off lease extender
 	if ttl == 0 {
-		go m.launchLeaseExtender()
+		go m.launchLeaseExtender(extensionId)
 	}
 
 	return ttl, nil
@@ -105,42 +107,32 @@ func (m *Mutex) Unlock(ctx context.Context) error {
 	return nil
 }
 
-func (m *Mutex) launchLeaseExtender() {
-	// Use a fresh root context here so that we explicitly manage the cancellation
-	leaseExtenderCtx, cancelFunc := context.WithCancel(context.Background())
-	m.leaseExtenderCancelFunc = cancelFunc
-	m.leaseExtensionLoop(leaseExtenderCtx)
-}
+func (m *Mutex) launchLeaseExtender(extensionId uuid.UUID) {
+	// Use a fresh root context here
+	ctx := context.Background()
 
-func (m *Mutex) leaseExtensionLoop(ctx context.Context) {
 	ticker := m.clock.Ticker(m.leaseDuration / 3)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			success, err := m.extendLease(ctx)
+			success, err := m.extendLease(ctx, extensionId)
 			if err != nil {
 				//FIXME log
 				return
 			}
 
-			// lock no longer exists so shut down the goroutine
+			// we don't own the lock anymore
 			if !success {
-				if m.leaseExtenderCancelFunc != nil {
-					m.leaseExtenderCancelFunc()
-				}
 				return
 			}
-		case <-ctx.Done():
-			// Context has been cancelled. Nothing to do...
-			return
 		}
 	}
 }
 
-func (m *Mutex) extendLease(ctx context.Context) (bool, error) {
-	result, err := m.client.Eval(ctx, extendScript, []string{m.key}, m.leaseDuration.Milliseconds()).Int64()
+func (m *Mutex) extendLease(ctx context.Context, acquireId uuid.UUID) (bool, error) {
+	result, err := m.client.Eval(ctx, extendScript, []string{m.key}, m.leaseDuration.Milliseconds(), acquireId).Int64()
 
 	if err != nil {
 		return false, fmt.Errorf("extending lease: %w", err)
@@ -151,10 +143,4 @@ func (m *Mutex) extendLease(ctx context.Context) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func (m *Mutex) stopLeaseExtender() {
-	if m.leaseExtenderCancelFunc != nil {
-		m.leaseExtenderCancelFunc()
-	}
 }
