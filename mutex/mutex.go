@@ -22,6 +22,7 @@ const unlockScript = `
 		return 0;
 	end;
 	redis.call('del', KEYS[1]);
+    redis.call('publish', KEYS[2], ARGV[1]);
 	return 1;
 `
 const extendScript = `
@@ -31,6 +32,7 @@ const extendScript = `
 	end;
 	return 0;
 `
+const unlockMsg = "unlocked"
 
 type Mutex struct {
 	clock         clock.Clock
@@ -73,6 +75,48 @@ func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mute
 	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration, clock: opts.clock}
 }
 
+func (m *Mutex) Lock(ctx context.Context) error {
+	success, err := m.TryLock(ctx)
+	if err != nil {
+		return fmt.Errorf("tryign to acquire lock: %w", err)
+	}
+
+	if success {
+		return nil
+	}
+
+	pubSub := m.client.Subscribe(ctx, m.getChannelName())
+	pubSubCh := pubSub.Channel()
+	defer func() {
+		if closeErr := pubSub.Close(); closeErr != nil {
+			// FIXME log
+		}
+	}()
+
+	for {
+		ttl, err := m.doTryLock(ctx)
+		if err != nil {
+			return fmt.Errorf("trying to acquire lock: %w", err)
+		}
+
+		if ttl == 0 {
+			return nil
+		}
+
+	wait:
+		select {
+		case <-m.clock.After(time.Duration(ttl) * time.Millisecond):
+			break wait
+		case msg := <-pubSubCh:
+			if msg.Payload == unlockMsg {
+				break wait
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("cancelled while waiting for lock: %w", err)
+		}
+	}
+}
+
 func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 	ttl, err := m.doTryLock(ctx)
 	if err != nil {
@@ -85,7 +129,7 @@ func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 func (m *Mutex) doTryLock(ctx context.Context) (int64, error) {
 	// Create an extension ID so that we only extend this lease if we own the lock
 	extensionId := uuid.New()
-	ttl, err := m.client.Eval(ctx, lockScript, []string{m.key}, m.leaseDuration.Milliseconds(), extensionId).Int64()
+	ttl, err := m.client.Eval(ctx, lockScript, []string{m.getLockName()}, m.leaseDuration.Milliseconds(), extensionId).Int64()
 	if err != nil {
 		return 0, err
 	}
@@ -99,7 +143,7 @@ func (m *Mutex) doTryLock(ctx context.Context) (int64, error) {
 }
 
 func (m *Mutex) Unlock(ctx context.Context) error {
-	_, err := m.client.Eval(ctx, unlockScript, []string{m.key}).Int64()
+	_, err := m.client.Eval(ctx, unlockScript, []string{m.getLockName(), m.getChannelName()}, unlockMsg).Int64()
 	if err != nil {
 		return fmt.Errorf("unlocked failed: %w", err)
 	}
@@ -143,4 +187,12 @@ func (m *Mutex) extendLease(ctx context.Context, acquireId uuid.UUID) (bool, err
 	}
 
 	return false, nil
+}
+
+func (m *Mutex) getLockName() string {
+	return fmt.Sprintf("go_redisson_lock:%s", m.key)
+}
+
+func (m *Mutex) getChannelName() string {
+	return fmt.Sprintf("go_redisson_lock_channel:%s", m.key)
 }
