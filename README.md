@@ -8,6 +8,8 @@ Distributed data structures backed by Redis. Heavily inspired by [Redisson](http
 
 ### Distributed Lock
 
+The `Mutex` struct aims to provide identical semantics to the [sync.Mutex](https://pkg.go.dev/sync#Mutex) package.
+
 ```go
 import (
 	"github.com/redis/go-redis/v9"
