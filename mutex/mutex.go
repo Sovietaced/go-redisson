@@ -55,18 +55,22 @@ func defaultOptions() *Options {
 
 type Option func(*Options)
 
+// WithLeaseDuration specifies the TTL on the underlying Redis cache entry. Practically speaking, this is the upper
+// bound on how long a lock will appear to be held when its owner abandons it.
 func WithLeaseDuration(leaseDuration time.Duration) Option {
 	return func(mo *Options) {
 		mo.leaseDuration = leaseDuration
 	}
 }
 
+// WithClock allows a pluggable clock primarily for unit testing.
 func WithClock(clock clock.Clock) Option {
 	return func(mo *Options) {
 		mo.clock = clock
 	}
 }
 
+// NewMutex Creates a new Mutex with the provided options.
 func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mutex {
 	opts := defaultOptions()
 	for _, option := range options {
@@ -75,16 +79,20 @@ func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mute
 	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration, clock: opts.clock}
 }
 
+// Lock blocks until the lock can be acquired. The function intelligently waits for either the lease duration to expire
+// or a pub sub notification that the lock has been released before attempting to acquire the lock.
 func (m *Mutex) Lock(ctx context.Context) error {
 	success, err := m.TryLock(ctx)
 	if err != nil {
 		return fmt.Errorf("tryign to acquire lock: %w", err)
 	}
 
+	// Lock acquired, can return.
 	if success {
 		return nil
 	}
 
+	// Subscribe to pubsub notifications
 	pubSub := m.client.Subscribe(ctx, m.getChannelName())
 	pubSubCh := pubSub.Channel()
 	defer func() {
@@ -93,6 +101,7 @@ func (m *Mutex) Lock(ctx context.Context) error {
 		}
 	}()
 
+	// Loop that tries to acquire the lock, otherwise waits for the lease duration or a pub sub notification
 	for {
 		ttl, err := m.doTryLock(ctx)
 		if err != nil {
@@ -117,6 +126,7 @@ func (m *Mutex) Lock(ctx context.Context) error {
 	}
 }
 
+// TryLock attempts to acquire the lock but does not block. Returns whether the lock was aquired.
 func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 	ttl, err := m.doTryLock(ctx)
 	if err != nil {
@@ -142,6 +152,7 @@ func (m *Mutex) doTryLock(ctx context.Context) (int64, error) {
 	return ttl, nil
 }
 
+// Unlock releases the lock. It will also publish an unlock notification on the Redis pub sub channel.
 func (m *Mutex) Unlock(ctx context.Context) error {
 	_, err := m.client.Eval(ctx, unlockScript, []string{m.getLockName(), m.getChannelName()}, unlockMsg).Int64()
 	if err != nil {
