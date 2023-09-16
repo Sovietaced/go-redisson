@@ -1,6 +1,8 @@
 # go-redisson
 
 [![Test](https://github.com/sovietaced/go-redisson/actions/workflows/ci.yml/badge.svg)](https://github.com/sovietaced/go-redisson/actions/workflows/ci.yml)
+[![GoDoc](https://godoc.org/github.com/sovietaced/go-redisson?status.png)](http://godoc.org/github.com/sovietaced/go-redisson)
+
  
 Distributed data structures backed by Redis. Heavily inspired by [Redisson](https://github.com/redisson/redisson).
 
