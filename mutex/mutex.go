@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/benbjohnson/clock"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/stdr"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"log"
 	"time"
 )
 
@@ -39,17 +42,20 @@ type Mutex struct {
 	client        redis.UniversalClient
 	key           string
 	leaseDuration time.Duration
+	logger        logr.Logger
 }
 
 type Options struct {
 	clock         clock.Clock
 	leaseDuration time.Duration
+	logger        logr.Logger
 }
 
 func defaultOptions() *Options {
 	opts := &Options{}
 	WithClock(clock.New())(opts)
 	WithLeaseDuration(defaultLeaseDuration)(opts)
+	WithLogger(stdr.New(log.Default()))
 	return opts
 }
 
@@ -70,13 +76,20 @@ func WithClock(clock clock.Clock) Option {
 	}
 }
 
+// WithLogger allows a pluggable logger implementation.
+func WithLogger(logger logr.Logger) Option {
+	return func(mo *Options) {
+		mo.logger = logger
+	}
+}
+
 // NewMutex Creates a new Mutex with the provided options.
 func NewMutex(client redis.UniversalClient, key string, options ...Option) *Mutex {
 	opts := defaultOptions()
 	for _, option := range options {
 		option(opts)
 	}
-	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration, clock: opts.clock}
+	return &Mutex{key: key, client: client, leaseDuration: opts.leaseDuration, clock: opts.clock, logger: opts.logger}
 }
 
 // Lock blocks until the lock can be acquired. The function intelligently waits for either the lease duration to expire
@@ -97,7 +110,7 @@ func (m *Mutex) Lock(ctx context.Context) error {
 	pubSubCh := pubSub.Channel()
 	defer func() {
 		if closeErr := pubSub.Close(); closeErr != nil {
-			// FIXME log
+			m.logger.Error(closeErr, "failed to close pub sub", "key", m.key)
 		}
 	}()
 
@@ -174,7 +187,7 @@ func (m *Mutex) launchLeaseExtender(extensionId uuid.UUID) {
 		case <-ticker.C:
 			success, err := m.extendLease(ctx, extensionId)
 			if err != nil {
-				//FIXME log
+				m.logger.Error(err, "failed to extend lease", "key", m.key)
 				return
 			}
 

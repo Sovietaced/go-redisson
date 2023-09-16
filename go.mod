@@ -6,6 +6,9 @@ replace github.com/docker/docker v23.0.5+incompatible => github.com/docker/docke
 
 require (
 	github.com/benbjohnson/clock v1.3.5
+	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/stdr v1.2.2
+	github.com/google/uuid v1.3.0
 	github.com/redis/go-redis/v9 v9.0.4
 	github.com/stretchr/testify v1.8.2
 	github.com/testcontainers/testcontainers-go v0.20.1
@@ -26,7 +29,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/klauspost/compress v1.11.13 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
