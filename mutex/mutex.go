@@ -61,7 +61,7 @@ func defaultOptions() *Options {
 
 type Option func(*Options)
 
-// WithLeaseDuration specifies the TTL on the underlying Redis cache entry. Practically speaking, this is the upper
+// WithLeaseDuration specifies the TTL on the underlying Redis map entry. Practically speaking, this is the upper
 // bound on how long a lock will appear to be held when its owner abandons it.
 func WithLeaseDuration(leaseDuration time.Duration) Option {
 	return func(mo *Options) {
