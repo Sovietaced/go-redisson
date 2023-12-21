@@ -28,15 +28,15 @@ The `Mapp` struct aims to provide similar semantics to native Go map.
 ```go
 ctx := context.Background()
 client := redis.NewClient(&redis.Options{Addr: endpoint})
-m := mapp.NewMapp(client)
+m := mapp.NewMap(client)
 err = m.Set(ctx, "key", "value")
 value, exists, err := m.Get(ctx, "key")
 ```
 
-The `Mapp` struct supports generics so you can use any struct you'd like for the key/value. By default, structs will be
+The `Map` struct supports generics so you can use any struct you'd like for the key/value. By default, structs will be
 marshalled using json but can be configured with key/value marshalers. 
 
 ```go
 
-m := mapp.NewMapp(client, mapp.WithKeyMarshaler(...), mapp.WithValueMarshaller(...))
+m := mapp.NewMap(client, mapp.WithKeyMarshaler(...), mapp.WithValueMarshaller(...))
 ```
