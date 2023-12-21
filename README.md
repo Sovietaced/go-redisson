@@ -23,7 +23,7 @@ err = mutex.Unlock(ctx)
 
 ### Distributed Map
 
-The `Mapp` struct aims to provide similar semantics to native Go map.
+The `Map` struct aims to provide similar semantics to a native Go map.
 
 ```go
 ctx := context.Background()
