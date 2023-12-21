@@ -7,6 +7,7 @@ import (
 	"github.com/sovietaced/go-redisson/marshal"
 )
 
+// Options for the Map
 type Options[K any, V any] struct {
 	namespace      string
 	keyMarshaler   marshal.Marshaler[K]
@@ -20,43 +21,50 @@ func defaultOptions[K any, V any]() *Options[K, V] {
 	return opts
 }
 
+// Option for the Map
 type Option[K any, V any] func(*Options[K, V])
 
+// WithNamespace adds a namespace to the map keyspace. This is highly recommended.
 func WithNamespace[K any, V any](namespace string) Option[K, V] {
 	return func(mo *Options[K, V]) {
 		mo.namespace = namespace
 	}
 }
 
+// WithKeyMarshaler allows you to configure how keys are marshaled into strings.
 func WithKeyMarshaler[K any, V any](marshaler marshal.Marshaler[K]) Option[K, V] {
 	return func(mo *Options[K, V]) {
 		mo.keyMarshaler = marshaler
 	}
 }
 
+// WithValueMarshaler allows you to configure how values are mashaled into strings.
 func WithValueMarshaler[K any, V any](marshaler marshal.Marshaler[V]) Option[K, V] {
 	return func(mo *Options[K, V]) {
 		mo.valueMarshaler = marshaler
 	}
 }
 
-type Mapp[K any, V any] struct {
+// Map data structure backed by Redis.
+type Map[K any, V any] struct {
 	namespace      string
 	client         redis.UniversalClient
 	keyMarshaler   marshal.Marshaler[K]
 	valueMarshaler marshal.Marshaler[V]
 }
 
-func NewMapp[K any, V any](client redis.UniversalClient, options ...Option[K, V]) *Mapp[K, V] {
+// NewMap creates a new generic map. Uses JSON key/value marshalers by default.
+func NewMap[K any, V any](client redis.UniversalClient, options ...Option[K, V]) *Map[K, V] {
 	opts := defaultOptions[K, V]()
 	for _, option := range options {
 		option(opts)
 	}
 
-	return &Mapp[K, V]{client: client, keyMarshaler: opts.keyMarshaler, valueMarshaler: opts.valueMarshaler, namespace: opts.namespace}
+	return &Map[K, V]{client: client, keyMarshaler: opts.keyMarshaler, valueMarshaler: opts.valueMarshaler, namespace: opts.namespace}
 }
 
-func (c *Mapp[K, V]) Get(ctx context.Context, key K) (V, bool, error) {
+// Get retrieves a key/value from the map. Returns the potential value, whether it exists, and any errors that occurred.
+func (c *Map[K, V]) Get(ctx context.Context, key K) (V, bool, error) {
 	keyString, err := c.computeKey(ctx, key)
 	if err != nil {
 		return *new(V), false, fmt.Errorf("computing key: %w", err)
@@ -79,7 +87,8 @@ func (c *Mapp[K, V]) Get(ctx context.Context, key K) (V, bool, error) {
 	return *value, true, nil
 }
 
-func (c *Mapp[K, V]) Set(ctx context.Context, key K, value V) error {
+// Set inserts a key/value into the map. Returns any errors that occurred.
+func (c *Map[K, V]) Set(ctx context.Context, key K, value V) error {
 	keyString, err := c.computeKey(ctx, key)
 	if err != nil {
 		return fmt.Errorf("computing key: %w", err)
@@ -98,7 +107,9 @@ func (c *Mapp[K, V]) Set(ctx context.Context, key K, value V) error {
 	return nil
 }
 
-func (c *Mapp[K, V]) Del(ctx context.Context, key K) error {
+// Del removes a key/value from the map. Returns any errors that occurred. If the key/value does not exist, this is
+// a no-op.
+func (c *Map[K, V]) Del(ctx context.Context, key K) error {
 	keyString, err := c.computeKey(ctx, key)
 	if err != nil {
 		return fmt.Errorf("computing key: %w", err)
@@ -112,7 +123,8 @@ func (c *Mapp[K, V]) Del(ctx context.Context, key K) error {
 	return nil
 }
 
-func (c *Mapp[K, V]) computeKey(ctx context.Context, key K) (string, error) {
+// computeKey computes the key to use for a key/value.
+func (c *Map[K, V]) computeKey(ctx context.Context, key K) (string, error) {
 	marshaledKey, err := c.keyMarshaler.Marshal(ctx, key)
 	if err != nil {
 		return "", fmt.Errorf("marshalling key: %w", err)
