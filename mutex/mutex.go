@@ -139,7 +139,7 @@ func (m *Mutex) Lock(ctx context.Context) error {
 	}
 }
 
-// TryLock attempts to acquire the lock but does not block. Returns whether the lock was aquired.
+// TryLock attempts to acquire the lock but does not block. Returns whether the lock was acquired.
 func (m *Mutex) TryLock(ctx context.Context) (bool, error) {
 	ttl, err := m.doTryLock(ctx)
 	if err != nil {
