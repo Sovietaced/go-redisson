@@ -28,7 +28,7 @@ The `Map` struct aims to provide similar semantics to a native Go map.
 ```go
 ctx := context.Background()
 client := redis.NewClient(&redis.Options{Addr: endpoint})
-m := mapp.NewMap(client)
+m := mapp.NewMap(client, "my-namespace")
 err = m.Set(ctx, "key", "value")
 value, exists, err := m.Get(ctx, "key")
 ```
