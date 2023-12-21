@@ -39,7 +39,7 @@ func TestCache(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: endpoint})
 
 	t.Run("get, set, delete string key/value", func(t *testing.T) {
-		cache := NewMap[string, string](client, WithNamespace[string, string](RandomNamespace()))
+		cache := NewMap[string, string](client, RandomNamespace())
 
 		err = cache.Set(ctx, "key", "value")
 		require.NoError(t, err)
