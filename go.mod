@@ -6,7 +6,7 @@ replace github.com/docker/docker v23.0.5+incompatible => github.com/docker/docke
 
 require (
 	github.com/benbjohnson/clock v1.3.5
-	github.com/go-logr/logr v1.3.0
+	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/stdr v1.2.2
 	github.com/google/uuid v1.5.0
 	github.com/redis/go-redis/v9 v9.3.1
