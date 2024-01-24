@@ -8,7 +8,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5
 	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/stdr v1.2.2
-	github.com/google/uuid v1.5.0
+	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.4.0
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.27.0
