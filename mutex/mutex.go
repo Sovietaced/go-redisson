@@ -182,19 +182,16 @@ func (m *Mutex) launchLeaseExtender(extensionId uuid.UUID) {
 	ticker := m.clock.Ticker(m.leaseDuration / 3)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			success, err := m.extendLease(ctx, extensionId)
-			if err != nil {
-				m.logger.Error(err, "failed to extend lease", "key", m.key)
-				return
-			}
+	for range ticker.C {
+		success, err := m.extendLease(ctx, extensionId)
+		if err != nil {
+			m.logger.Error(err, "failed to extend lease", "key", m.key)
+			return
+		}
 
-			// we don't own the lock anymore
-			if !success {
-				return
-			}
+		// we don't own the lock anymore
+		if !success {
+			return
 		}
 	}
 }

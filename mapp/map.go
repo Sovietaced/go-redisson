@@ -9,7 +9,6 @@ import (
 
 // Options for the Map
 type Options[K any, V any] struct {
-	namespace      string
 	keyMarshaler   marshal.Marshaler[K]
 	valueMarshaler marshal.Marshaler[V]
 }
