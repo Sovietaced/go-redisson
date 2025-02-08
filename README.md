@@ -28,7 +28,7 @@ The `Map` struct aims to provide similar semantics to a native Go map.
 ```go
 ctx := context.Background()
 client := redis.NewClient(&redis.Options{Addr: endpoint})
-m := mapp.NewMap(client, "my-namespace")
+m := rmap.NewMap(client, "my-namespace")
 err = m.Set(ctx, "key", "value")
 value, exists, err := m.Get(ctx, "key")
 ```
@@ -38,5 +38,5 @@ marshalled using json but can be configured with key/value marshalers.
 
 ```go
 
-m := mapp.NewMap(client, mapp.WithKeyMarshaler(...), mapp.WithValueMarshaller(...))
+m := rmap.NewMap(client, rmap.WithKeyMarshaler(...), rmap.WithValueMarshaller(...))
 ```
